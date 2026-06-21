@@ -87,12 +87,20 @@ void Error_Handler(void);
 #define FAN_IO_GPIO_Port GPIOA
 #define Beep_Pin GPIO_PIN_12
 #define Beep_GPIO_Port GPIOA
+#define RGB_lvjing_BIN2_Pin GPIO_PIN_3
+#define RGB_lvjing_BIN2_GPIO_Port GPIOB
 #define KEY_FAN_Pin GPIO_PIN_4
 #define KEY_FAN_GPIO_Port GPIOB
 #define KEY_CNT_Pin GPIO_PIN_5
 #define KEY_CNT_GPIO_Port GPIOB
 #define KEY_TEMP_Pin GPIO_PIN_6
 #define KEY_TEMP_GPIO_Port GPIOB
+#define RGB_lvjing_BIN1_Pin GPIO_PIN_7
+#define RGB_lvjing_BIN1_GPIO_Port GPIOB
+#define RGB_MOTO_AIN1_Pin GPIO_PIN_8
+#define RGB_MOTO_AIN1_GPIO_Port GPIOB
+#define RGB_MOTO_AIN2_Pin GPIO_PIN_9
+#define RGB_MOTO_AIN2_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

@@ -68,6 +68,51 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void moto1_run()
+{
+  HAL_GPIO_WritePin(RGB_MOTO_AIN1_GPIO_Port, RGB_MOTO_AIN1_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(RGB_MOTO_AIN2_GPIO_Port, RGB_MOTO_AIN2_Pin, GPIO_PIN_RESET);
+}
+
+void moto1_stop()
+{
+  HAL_GPIO_WritePin(RGB_MOTO_AIN1_GPIO_Port, RGB_MOTO_AIN1_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(RGB_MOTO_AIN2_GPIO_Port, RGB_MOTO_AIN2_Pin, GPIO_PIN_SET);
+}
+
+void moto2_run()
+{
+  HAL_GPIO_WritePin(RGB_lvjing_BIN1_GPIO_Port, RGB_lvjing_BIN1_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(RGB_lvjing_BIN2_GPIO_Port, RGB_lvjing_BIN2_Pin, GPIO_PIN_RESET);
+}
+
+void moto2_stop()
+{
+  HAL_GPIO_WritePin(RGB_lvjing_BIN2_GPIO_Port, RGB_lvjing_BIN2_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(RGB_lvjing_BIN2_GPIO_Port, RGB_lvjing_BIN2_Pin, GPIO_PIN_SET);
+}
+
+void moto_state()
+{
+  if(num==1)
+  {
+    moto1_run();
+  }
+  else
+  {
+    moto1_stop();
+  }
+
+  if(num==2)
+  {
+    moto2_run();
+  }
+  else
+  {
+    moto2_stop();
+  }
+}
+
 void HuoEr_state()
 {
     if (HAL_GPIO_ReadPin(D0_LVJING_GPIO_Port, D0_LVJING_Pin) == GPIO_PIN_SET)
@@ -276,7 +321,7 @@ int main(void)
     beep_state();
     Power_led_state();
     fan_state();
-
+    moto_state();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
