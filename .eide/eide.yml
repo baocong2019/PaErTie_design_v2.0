@@ -6,6 +6,7 @@ packDir: .pack/Keil/STM32F1xx_DFP.2.3.0
 srcDirs:
   - Core
   - Drivers
+  - Core/oled
 virtualFolder:
   name: <virtual_root>
   files: []
@@ -29,7 +30,9 @@ targets:
         - Drivers/STM32F1xx_HAL_Driver/Inc/Legacy
         - Drivers/CMSIS/Device/ST/STM32F1xx/Include
         - Drivers/CMSIS/Include
-      libList: []
+        - Core/oled
+      libList:
+        - Core/oled
     excludeList: []
     settings: {}
     toolchain: GCC

@@ -48,9 +48,16 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(board_led_GPIO_Port, board_led_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, OLED_SDA_Pin|OLED_SCL_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : board_led_Pin */
   GPIO_InitStruct.Pin = board_led_Pin;
@@ -58,6 +65,27 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(board_led_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : KEY_R_Pin KEY_ADD_Pin KEY_TIME_Pin KEY_G_Pin */
+  GPIO_InitStruct.Pin = KEY_R_Pin|KEY_ADD_Pin|KEY_TIME_Pin|KEY_G_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : OLED_SDA_Pin OLED_SCL_Pin Beep_Pin */
+  GPIO_InitStruct.Pin = OLED_SDA_Pin|OLED_SCL_Pin|Beep_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : KEY_B_Pin D0_LVJING_Pin D0_RGB_Pin KEY_FAN_Pin
+                           KEY_CNT_Pin KEY_TEMP_Pin */
+  GPIO_InitStruct.Pin = KEY_B_Pin|D0_LVJING_Pin|D0_RGB_Pin|KEY_FAN_Pin
+                          |KEY_CNT_Pin|KEY_TEMP_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 

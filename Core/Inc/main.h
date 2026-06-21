@@ -59,6 +59,32 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define board_led_Pin GPIO_PIN_13
 #define board_led_GPIO_Port GPIOC
+#define KEY_R_Pin GPIO_PIN_0
+#define KEY_R_GPIO_Port GPIOA
+#define KEY_ADD_Pin GPIO_PIN_1
+#define KEY_ADD_GPIO_Port GPIOA
+#define KEY_TIME_Pin GPIO_PIN_4
+#define KEY_TIME_GPIO_Port GPIOA
+#define KEY_G_Pin GPIO_PIN_5
+#define KEY_G_GPIO_Port GPIOA
+#define OLED_SDA_Pin GPIO_PIN_6
+#define OLED_SDA_GPIO_Port GPIOA
+#define OLED_SCL_Pin GPIO_PIN_7
+#define OLED_SCL_GPIO_Port GPIOA
+#define KEY_B_Pin GPIO_PIN_0
+#define KEY_B_GPIO_Port GPIOB
+#define D0_LVJING_Pin GPIO_PIN_1
+#define D0_LVJING_GPIO_Port GPIOB
+#define D0_RGB_Pin GPIO_PIN_11
+#define D0_RGB_GPIO_Port GPIOB
+#define Beep_Pin GPIO_PIN_12
+#define Beep_GPIO_Port GPIOA
+#define KEY_FAN_Pin GPIO_PIN_4
+#define KEY_FAN_GPIO_Port GPIOB
+#define KEY_CNT_Pin GPIO_PIN_5
+#define KEY_CNT_GPIO_Port GPIOB
+#define KEY_TEMP_Pin GPIO_PIN_6
+#define KEY_TEMP_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

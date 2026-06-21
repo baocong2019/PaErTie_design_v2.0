@@ -24,7 +24,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "../oled/driver_ssd1306_basic.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,13 +39,16 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+void HuoEr_state(void);
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+TIM_HandleTypeDef htim2;
 
+uint32_t led_cnt = 0;
+uint32_t num = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -56,7 +59,49 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void HuoEr_state()
+{
+    if (HAL_GPIO_ReadPin(D0_LVJING_GPIO_Port, D0_LVJING_Pin) == GPIO_PIN_SET)
+    {
+      snprintf(buf, sizeof(buf), "HR1: %d", 1);
+      ssd1306_basic_string(0, 12, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+    }
+    else
+    {
+      snprintf(buf, sizeof(buf), "HR1: %d", 0);
+      ssd1306_basic_string(0, 12, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+    }
+    
+    if (HAL_GPIO_ReadPin(D0_RGB_GPIO_Port, D0_RGB_Pin) == GPIO_PIN_SET)
+    {
+      snprintf(buf, sizeof(buf), "HR2: %d", 1);
+      ssd1306_basic_string(0, 24, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+    }
+    else
+    {
+      snprintf(buf, sizeof(buf), "HR2: %d", 0);
+      ssd1306_basic_string(0, 24, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+    }
+}
 
+void key_state()
+{
+    
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if(htim->Instance == TIM1)
+    {
+        led_cnt++;
+        if(led_cnt >= 10) 
+        {
+            led_cnt = 0;
+            num++;
+            HAL_GPIO_TogglePin(board_led_GPIO_Port, board_led_Pin);
+        }
+    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -67,7 +112,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  char buf[80];
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -90,16 +135,23 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   MX_TIM1_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_TIM_Base_Start_IT(&htim1);
+  ssd1306_basic_init(SSD1306_INTERFACE_IIC, SSD1306_ADDR_SA0_0);
+  ssd1306_basic_display_on();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    HAL_GPIO_TogglePin(board_led_GPIO_Port, board_led_Pin);
-    HAL_Delay(500);
+    snprintf(buf, sizeof(buf), "num is %d", num);
+    ssd1306_basic_string(0, 0, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+    
+    HuoEr_state();
+    
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
