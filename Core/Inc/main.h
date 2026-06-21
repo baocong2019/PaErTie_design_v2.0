@@ -59,6 +59,10 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define board_led_Pin GPIO_PIN_13
 #define board_led_GPIO_Port GPIOC
+#define LED_G_Pin GPIO_PIN_14
+#define LED_G_GPIO_Port GPIOC
+#define LED_B_Pin GPIO_PIN_15
+#define LED_B_GPIO_Port GPIOC
 #define KEY_R_Pin GPIO_PIN_0
 #define KEY_R_GPIO_Port GPIOA
 #define KEY_ADD_Pin GPIO_PIN_1
@@ -75,8 +79,12 @@ void Error_Handler(void);
 #define KEY_B_GPIO_Port GPIOB
 #define D0_LVJING_Pin GPIO_PIN_1
 #define D0_LVJING_GPIO_Port GPIOB
+#define DS18B20_Pin GPIO_PIN_10
+#define DS18B20_GPIO_Port GPIOB
 #define D0_RGB_Pin GPIO_PIN_11
 #define D0_RGB_GPIO_Port GPIOB
+#define FAN_IO_Pin GPIO_PIN_11
+#define FAN_IO_GPIO_Port GPIOA
 #define Beep_Pin GPIO_PIN_12
 #define Beep_GPIO_Port GPIOA
 #define KEY_FAN_Pin GPIO_PIN_4

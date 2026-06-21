@@ -40,6 +40,10 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 void HuoEr_state(void);
+void key_state(void);
+void beep_state(void);
+void Power_led_state(void);
+void fan_state(void);
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -47,8 +51,13 @@ void HuoEr_state(void);
 /* USER CODE BEGIN PV */
 TIM_HandleTypeDef htim2;
 
+char buf[80];
 uint32_t led_cnt = 0;
 uint32_t num = 0;
+uint32_t key_num = 0;
+uint32_t num_cnt = 0;
+uint8_t beep_active = RESET;  
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -86,7 +95,121 @@ void HuoEr_state()
 
 void key_state()
 {
-    
+    if (HAL_GPIO_ReadPin(KEY_ADD_GPIO_Port, KEY_ADD_Pin) == GPIO_PIN_RESET)
+    {
+      num=1;
+    }
+    else if(HAL_GPIO_ReadPin(KEY_CNT_GPIO_Port, KEY_CNT_Pin) == GPIO_PIN_RESET)
+    {
+      num=2;
+    }
+    else if(HAL_GPIO_ReadPin(KEY_TEMP_GPIO_Port, KEY_TEMP_Pin) == GPIO_PIN_RESET)
+    {
+      num=3;
+    }
+    else if(HAL_GPIO_ReadPin(KEY_TIME_GPIO_Port, KEY_TIME_Pin) == GPIO_PIN_RESET)
+    {
+      num=4;
+    }
+    else if(HAL_GPIO_ReadPin(KEY_FAN_GPIO_Port, KEY_FAN_Pin) == GPIO_PIN_RESET)
+    {
+      num=5;
+    }
+    else if(HAL_GPIO_ReadPin(KEY_R_GPIO_Port, KEY_R_Pin) == GPIO_PIN_RESET)
+    {
+      num=6;
+    }
+    else if(HAL_GPIO_ReadPin(KEY_G_GPIO_Port, KEY_G_Pin) == GPIO_PIN_RESET)
+    {
+      num=7;
+    }
+    else if(HAL_GPIO_ReadPin(KEY_B_GPIO_Port, KEY_B_Pin) == GPIO_PIN_RESET)
+    {
+      num=8;
+      beep_active=SET;
+    }
+    else
+    {
+      num=0;
+    }
+
+    switch(num)
+    {
+      case 1:
+      snprintf(buf, sizeof(buf), "key is %s", "ADD "); break;
+      case 2:
+      snprintf(buf, sizeof(buf), "key is %s", "CNT "); break;
+      case 3:
+      snprintf(buf, sizeof(buf), "key is %s", "TEMP"); break;
+      case 4:
+      snprintf(buf, sizeof(buf), "key is %s", "TIME"); break;
+      case 5:
+      snprintf(buf, sizeof(buf), "key is %s", "FAN "); break;
+      case 6:
+      snprintf(buf, sizeof(buf), "key is %s", "R   "); break;
+      case 7:
+      snprintf(buf, sizeof(buf), "key is %s", "G   "); break;
+      case 8:
+      snprintf(buf, sizeof(buf), "key is %s", "B   "); break;
+      default:
+      snprintf(buf, sizeof(buf), "key is %s", "NONE"); break;
+    }
+    ssd1306_basic_string(0, 36, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+}
+
+void beep_state()
+{
+  if(beep_active == SET)
+  {
+    HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_SET);
+    HAL_Delay(300);
+    HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
+    beep_active = RESET;
+  }
+  
+}
+
+void Power_led_state()
+{
+  if(num==6)
+  {
+    HAL_GPIO_WritePin(board_led_GPIO_Port, board_led_Pin, GPIO_PIN_SET);
+  }
+  else
+  {
+    HAL_GPIO_WritePin(board_led_GPIO_Port, board_led_Pin, GPIO_PIN_RESET);
+  }
+
+  if(num==7)
+  {
+    HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_SET);
+  }
+  else
+  {
+    HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_RESET);
+  }
+
+  if(num==8)
+  {
+    HAL_GPIO_WritePin(LED_B_GPIO_Port, LED_B_Pin, GPIO_PIN_SET);
+  }
+  else
+  {
+    HAL_GPIO_WritePin(LED_B_GPIO_Port, LED_B_Pin, GPIO_PIN_RESET);
+  }
+
+}
+
+void fan_state()
+{
+  if(num==5)
+  {
+    HAL_GPIO_WritePin(FAN_IO_GPIO_Port, FAN_IO_Pin, GPIO_PIN_SET);
+  }
+  else
+  {
+    HAL_GPIO_WritePin(FAN_IO_GPIO_Port, FAN_IO_Pin, GPIO_PIN_RESET);
+  }
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
@@ -97,8 +220,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         if(led_cnt >= 10) 
         {
             led_cnt = 0;
-            num++;
-            HAL_GPIO_TogglePin(board_led_GPIO_Port, board_led_Pin);
+            num_cnt++;
         }
     }
 }
@@ -112,7 +234,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-  char buf[80];
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -145,12 +267,15 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-  {
-    snprintf(buf, sizeof(buf), "num is %d", num);
+  {  
+    snprintf(buf, sizeof(buf), "num is %ld", num_cnt);
     ssd1306_basic_string(0, 0, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
-    
+
     HuoEr_state();
-    
+    key_state();
+    beep_state();
+    Power_led_state();
+    fan_state();
 
     /* USER CODE END WHILE */
 
