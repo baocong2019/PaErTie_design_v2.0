@@ -154,6 +154,30 @@ uint8_t ssd1306_basic_write_point(uint8_t x, uint8_t y, uint8_t data);
 uint8_t ssd1306_basic_read_point(uint8_t x, uint8_t y, uint8_t *data);
 
 /**
+ * @brief     basic example draw a string (writes GRAM but does NOT flush to display)
+ * @param[in] x coordinate x
+ * @param[in] y coordinate y
+ * @param[in] *str pointer to a written string address
+ * @param[in] len length of the string
+ * @param[in] color display color
+ * @param[in] font display font size
+ * @return    status code
+ *            - 0 success
+ *            - 1 write string failed
+ * @note      use ssd1306_basic_gram_update() to flush after all writes
+ */
+uint8_t ssd1306_basic_string_no_update(uint8_t x, uint8_t y, char *str, uint16_t len, uint8_t color, ssd1306_font_t font);
+
+/**
+ * @brief     flush GRAM buffer to OLED display (call once after all string/rect writes)
+ * @return    status code
+ *            - 0 success
+ *            - 1 update failed
+ * @note      none
+ */
+uint8_t ssd1306_basic_gram_update(void);
+
+/**
  * @brief     basic example draw a string
  * @param[in] x coordinate x
  * @param[in] y coordinate y

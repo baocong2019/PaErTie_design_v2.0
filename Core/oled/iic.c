@@ -1,138 +1,124 @@
+/*
+ * Simple software I2C (bit-bang) driver for STM32 HAL
+ * Pins used: OLED_SCL = PA7, OLED_SDA = PA6
+ * Optimized with direct register access instead of HAL_GPIO_Init
+ */
 #include "iic.h"
 #include "main.h"
 
-/* short delay for timing (tuned empirically) */
+/* Pin numbers (0-15) for CRL/CRH register shifting */
+#define IIC_SDA_PIN_NUM   6   /* PA6 */
+#define IIC_SCL_PIN_NUM   7   /* PA7 */
+
+/* ── direct register macros ────────────────────────────────── */
+#define SCL_H()   (GPIOA->BSRR = OLED_SCL_Pin)
+#define SCL_L()   (GPIOA->BRR  = OLED_SCL_Pin)
+#define SDA_H()   (GPIOA->BSRR = OLED_SDA_Pin)
+#define SDA_L()   (GPIOA->BRR  = OLED_SDA_Pin)
+#define SDA_RD()  ((GPIOA->IDR & OLED_SDA_Pin) != 0)
+
+/* ── I2C half-bit delay (~800ns @72MHz, suitable for 400kHz I2C) ── */
 static void iic_delay(void)
 {
-	volatile int i = 0;
-	for (i = 0; i < 30; i++) {
-		__NOP();
-	}
+    for (volatile int i = 0; i < 15; i++) {
+        __NOP();
+    }
 }
 
-/* set SDA as output */
+/* ── SDA direction control (direct CRL write, no HAL) ── */
 static void sda_output(void)
 {
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	GPIO_InitStruct.Pin = OLED_SDA_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
-	GPIO_InitStruct.Pull = GPIO_PULLUP;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-	HAL_GPIO_Init(OLED_SDA_GPIO_Port, &GPIO_InitStruct);
+    uint32_t crl = GPIOA->CRL;
+    crl &= ~(0x0FUL << (IIC_SDA_PIN_NUM * 4));
+    crl |=  (0x06UL << (IIC_SDA_PIN_NUM * 4));   /* Output open-drain, 50 MHz */
+    GPIOA->CRL = crl;
 }
 
-/* set SDA as input */
 static void sda_input(void)
 {
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	GPIO_InitStruct.Pin = OLED_SDA_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-	GPIO_InitStruct.Pull = GPIO_PULLUP;
-	HAL_GPIO_Init(OLED_SDA_GPIO_Port, &GPIO_InitStruct);
+    uint32_t crl = GPIOA->CRL;
+    crl &= ~(0x0FUL << (IIC_SDA_PIN_NUM * 4));
+    crl |=  (0x08UL << (IIC_SDA_PIN_NUM * 4));   /* Input */
+    GPIOA->CRL = crl;
+    GPIOA->ODR |= OLED_SDA_Pin;                   /* internal pull-up */
 }
 
+/* ── public API ────────────────────────────────────────────── */
 uint8_t iic_init(void)
 {
-	/* ensure GPIO clocks and pins are already initialized by CubeMX
-	 * here we set pins to idle high
-	 */
-	HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(OLED_SDA_GPIO_Port, OLED_SDA_Pin, GPIO_PIN_SET);
-	sda_output();
-	return 0;
+    SCL_H();
+    SDA_H();
+    sda_output();
+    return 0;
 }
 
 uint8_t iic_deinit(void)
 {
-	/* set pins to inputs to save power */
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	GPIO_InitStruct.Pin = OLED_SCL_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	HAL_GPIO_Init(OLED_SCL_GPIO_Port, &GPIO_InitStruct);
-	GPIO_InitStruct.Pin = OLED_SDA_Pin;
-	HAL_GPIO_Init(OLED_SDA_GPIO_Port, &GPIO_InitStruct);
-	return 0;
+    uint32_t crl = GPIOA->CRL;
+    crl &= ~((0x0FUL << (IIC_SCL_PIN_NUM * 4)) | (0x0FUL << (IIC_SDA_PIN_NUM * 4)));
+    crl |=  (0x08UL << (IIC_SCL_PIN_NUM * 4)) | (0x08UL << (IIC_SDA_PIN_NUM * 4));
+    GPIOA->CRL = crl;
+    return 0;
 }
 
-/* generate start condition */
+/* ── I2C bus operations ────────────────────────────────────── */
 static void iic_start(void)
 {
-	sda_output();
-	HAL_GPIO_WritePin(OLED_SDA_GPIO_Port, OLED_SDA_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, GPIO_PIN_SET);
-	iic_delay();
-	HAL_GPIO_WritePin(OLED_SDA_GPIO_Port, OLED_SDA_Pin, GPIO_PIN_RESET);
-	iic_delay();
-	HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, GPIO_PIN_RESET);
+    sda_output();
+    SDA_H();
+    SCL_H();
+    iic_delay();
+    SDA_L();
+    iic_delay();
+    SCL_L();
 }
 
-/* generate stop condition */
 static void iic_stop(void)
 {
-	sda_output();
-	HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(OLED_SDA_GPIO_Port, OLED_SDA_Pin, GPIO_PIN_RESET);
-	iic_delay();
-	HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, GPIO_PIN_SET);
-	iic_delay();
-	HAL_GPIO_WritePin(OLED_SDA_GPIO_Port, OLED_SDA_Pin, GPIO_PIN_SET);
-	iic_delay();
+    sda_output();
+    SCL_L();
+    SDA_L();
+    iic_delay();
+    SCL_H();
+    iic_delay();
+    SDA_H();
+    iic_delay();
 }
 
-/* write a byte, return 0 if ACK received, 1 if NACK */
+/* Write one byte, return 0 = ACK, 1 = NACK */
 static uint8_t iic_write_byte(uint8_t data)
 {
-	uint8_t i;
-	sda_output();
-	for (i = 0; i < 8; i++) {
-		if (data & 0x80) {
-			HAL_GPIO_WritePin(OLED_SDA_GPIO_Port, OLED_SDA_Pin, GPIO_PIN_SET);
-		} else {
-			HAL_GPIO_WritePin(OLED_SDA_GPIO_Port, OLED_SDA_Pin, GPIO_PIN_RESET);
-		}
-		data <<= 1;
-		iic_delay();
-		HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, GPIO_PIN_SET);
-		iic_delay();
-		HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, GPIO_PIN_RESET);
-	}
-	/* release SDA for ACK */
-	sda_input();
-	iic_delay();
-	HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, GPIO_PIN_SET);
-	iic_delay();
-	uint8_t ack = HAL_GPIO_ReadPin(OLED_SDA_GPIO_Port, OLED_SDA_Pin);
-	HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, GPIO_PIN_RESET);
-	sda_output();
-	return ack; /* 0 means ACK */
+    sda_output();
+    for (int i = 0; i < 8; i++) {
+        if (data & 0x80) SDA_H();
+        else             SDA_L();
+        data <<= 1;
+        iic_delay();
+        SCL_H();
+        iic_delay();
+        SCL_L();
+    }
+    /* read ACK */
+    sda_input();
+    iic_delay();
+    SCL_H();
+    iic_delay();
+    uint8_t ack = SDA_RD();
+    SCL_L();
+    sda_output();
+    return ack;
 }
 
-/* write buffer: addr is 7-bit address, reg is first byte to send after addr */
+/* Write buffer: addr = 7-bit I2C address already in 8-bit format,
+   reg = first control byte, buf = data, len = data length */
 uint8_t iic_write(uint8_t addr, uint8_t reg, uint8_t *buf, uint16_t len)
 {
-	uint8_t ret;
-	iic_start();
-	/* send device addr byte (driver uses 8-bit address value like 0x78) */
-	ret = iic_write_byte(addr);
-	if (ret) {
-		iic_stop();
-		return 1;
-	}
-	/* send register/control byte */
-	ret = iic_write_byte(reg);
-	if (ret) {
-		iic_stop();
-		return 1;
-	}
-	for (uint16_t i = 0; i < len; i++) {
-		ret = iic_write_byte(buf[i]);
-		if (ret) {
-			iic_stop();
-			return 1;
-		}
-	}
-	iic_stop();
-	return 0;
+    iic_start();
+    if (iic_write_byte(addr)) { iic_stop(); return 1; }
+    if (iic_write_byte(reg))  { iic_stop(); return 1; }
+    for (uint16_t i = 0; i < len; i++) {
+        if (iic_write_byte(buf[i])) { iic_stop(); return 1; }
+    }
+    iic_stop();
+    return 0;
 }
-

@@ -25,6 +25,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "../oled/driver_ssd1306_basic.h"
+#include "../DS18b20/ds18b20.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,6 +45,7 @@ void key_state(void);
 void beep_state(void);
 void Power_led_state(void);
 void fan_state(void);
+void temp_state(void);
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -56,7 +58,8 @@ uint32_t led_cnt = 0;
 uint32_t num = 0;
 uint32_t key_num = 0;
 uint32_t num_cnt = 0;
-uint8_t beep_active = RESET;  
+uint8_t beep_active = RESET;
+uint8_t temp_tick = 0;
 
 /* USER CODE END PV */
 
@@ -88,7 +91,7 @@ void moto2_run()
 
 void moto2_stop()
 {
-  HAL_GPIO_WritePin(RGB_lvjing_BIN2_GPIO_Port, RGB_lvjing_BIN2_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(RGB_lvjing_BIN1_GPIO_Port, RGB_lvjing_BIN1_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(RGB_lvjing_BIN2_GPIO_Port, RGB_lvjing_BIN2_Pin, GPIO_PIN_SET);
 }
 
@@ -118,23 +121,23 @@ void HuoEr_state()
     if (HAL_GPIO_ReadPin(D0_LVJING_GPIO_Port, D0_LVJING_Pin) == GPIO_PIN_SET)
     {
       snprintf(buf, sizeof(buf), "HR1: %d", 1);
-      ssd1306_basic_string(0, 12, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+      ssd1306_basic_string_no_update(0, 12, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
     }
     else
     {
       snprintf(buf, sizeof(buf), "HR1: %d", 0);
-      ssd1306_basic_string(0, 12, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+      ssd1306_basic_string_no_update(0, 12, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
     }
-    
+
     if (HAL_GPIO_ReadPin(D0_RGB_GPIO_Port, D0_RGB_Pin) == GPIO_PIN_SET)
     {
       snprintf(buf, sizeof(buf), "HR2: %d", 1);
-      ssd1306_basic_string(0, 24, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+      ssd1306_basic_string_no_update(0, 24, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
     }
     else
     {
       snprintf(buf, sizeof(buf), "HR2: %d", 0);
-      ssd1306_basic_string(0, 24, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+      ssd1306_basic_string_no_update(0, 24, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
     }
 }
 
@@ -199,7 +202,7 @@ void key_state()
       default:
       snprintf(buf, sizeof(buf), "key is %s", "NONE"); break;
     }
-    ssd1306_basic_string(0, 36, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+    ssd1306_basic_string_no_update(0, 36, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
 }
 
 void beep_state()
@@ -257,12 +260,34 @@ void fan_state()
   }
 }
 
+void temp_state()
+{
+  char tbuf[20];
+  int16_t val = DS18B20_GetTempTenths();
+
+  if (val == DS18B20_ERROR_VAL)
+  {
+    snprintf(tbuf, sizeof(tbuf), "TEMP: --.- C");
+  }
+  else
+  {
+    uint8_t neg = 0;
+    if (val < 0) { neg = 1; val = (int16_t)(-val); }
+    uint8_t int_part = (uint8_t)(val / 10);
+    uint8_t dec_part = (uint8_t)(val % 10);
+    snprintf(tbuf, sizeof(tbuf), "TEMP:%c%d.%d C",
+             neg ? '-' : ' ', int_part, dec_part);
+  }
+  ssd1306_basic_string_no_update(0, 48, tbuf, (uint16_t)strlen(tbuf), 0, SSD1306_FONT_12);
+}
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if(htim->Instance == TIM1)
     {
         led_cnt++;
-        if(led_cnt >= 10) 
+        temp_tick = 1;                    /* 100 ms temperature update flag */
+        if(led_cnt >= 10)
         {
             led_cnt = 0;
             num_cnt++;
@@ -304,17 +329,19 @@ int main(void)
   MX_TIM1_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
   HAL_TIM_Base_Start_IT(&htim1);
   ssd1306_basic_init(SSD1306_INTERFACE_IIC, SSD1306_ADDR_SA0_0);
   ssd1306_basic_display_on();
+  DS18B20_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-  {  
+  {
     snprintf(buf, sizeof(buf), "num is %ld", num_cnt);
-    ssd1306_basic_string(0, 0, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+    ssd1306_basic_string_no_update(0, 0, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
 
     HuoEr_state();
     key_state();
@@ -322,6 +349,17 @@ int main(void)
     Power_led_state();
     fan_state();
     moto_state();
+
+    /* ── 100 ms temperature update + display ── */
+    if (temp_tick)
+    {
+        DS18B20_Process();
+        temp_tick = 0;
+    }
+    temp_state();
+
+    /* single GRAM flush per loop — all display writes above use _no_update */
+    ssd1306_basic_gram_update();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
