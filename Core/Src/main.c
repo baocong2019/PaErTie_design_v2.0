@@ -35,7 +35,15 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define Key_None 0
+#define Key_Add 1
+#define Key_Cnt 2
+#define Key_Temp 3
+#define Key_Time 4
+#define Key_Fan 5
+#define Key_R 6
+#define Key_G 7
+#define Key_B 8
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -60,7 +68,9 @@ uint32_t key_num = 0;
 uint32_t num_cnt = 0;
 uint8_t beep_active = RESET;
 uint8_t temp_tick = 0;
-
+uint32_t target_temp = 0;
+uint8_t Time_fen=0;
+uint8_t Time_miao=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -115,6 +125,26 @@ void moto_state()
     moto2_stop();
   }
 }
+/**
+ * P1  P2  PWM
+ * 0  0    1    停止
+ * 0  1    1    正转
+ * 1  0    1    反转
+ */
+void PaErTie_Run()
+{
+  HAL_GPIO_WritePin(PaErTie_AIN1_GPIO_Port, PaErTie_PWM_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(PaErTie_AIN1_GPIO_Port, PaErTie_AIN1_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(PaErTie_AIN2_GPIO_Port, PaErTie_AIN2_Pin, GPIO_PIN_RESET);
+}
+
+void PaErTie_Stop()
+{
+  HAL_GPIO_WritePin(PaErTie_AIN1_GPIO_Port, PaErTie_PWM_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(PaErTie_AIN1_GPIO_Port, PaErTie_AIN1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(PaErTie_AIN2_GPIO_Port, PaErTie_AIN2_Pin, GPIO_PIN_RESET);
+}
+
 
 void HuoEr_state()
 {
@@ -145,59 +175,59 @@ void key_state()
 {
     if (HAL_GPIO_ReadPin(KEY_ADD_GPIO_Port, KEY_ADD_Pin) == GPIO_PIN_RESET)
     {
-      num=1;
+      num=Key_Add;
     }
     else if(HAL_GPIO_ReadPin(KEY_CNT_GPIO_Port, KEY_CNT_Pin) == GPIO_PIN_RESET)
     {
-      num=2;
+      num=Key_Cnt;
     }
     else if(HAL_GPIO_ReadPin(KEY_TEMP_GPIO_Port, KEY_TEMP_Pin) == GPIO_PIN_RESET)
     {
-      num=3;
+      num=Key_Temp;
     }
     else if(HAL_GPIO_ReadPin(KEY_TIME_GPIO_Port, KEY_TIME_Pin) == GPIO_PIN_RESET)
     {
-      num=4;
+      num=Key_Time;
     }
     else if(HAL_GPIO_ReadPin(KEY_FAN_GPIO_Port, KEY_FAN_Pin) == GPIO_PIN_RESET)
     {
-      num=5;
+      num=Key_Fan;
     }
     else if(HAL_GPIO_ReadPin(KEY_R_GPIO_Port, KEY_R_Pin) == GPIO_PIN_RESET)
     {
-      num=6;
+      num=Key_R;
     }
     else if(HAL_GPIO_ReadPin(KEY_G_GPIO_Port, KEY_G_Pin) == GPIO_PIN_RESET)
     {
-      num=7;
+      num=Key_G;
     }
     else if(HAL_GPIO_ReadPin(KEY_B_GPIO_Port, KEY_B_Pin) == GPIO_PIN_RESET)
     {
-      num=8;
+      num=Key_B;
       beep_active=SET;
     }
     else
     {
-      num=0;
+      num=Key_None;
     }
 
     switch(num)
     {
-      case 1:
+      case Key_Add:
       snprintf(buf, sizeof(buf), "key is %s", "ADD "); break;
-      case 2:
+      case Key_Cnt:
       snprintf(buf, sizeof(buf), "key is %s", "CNT "); break;
-      case 3:
+      case Key_Temp:
       snprintf(buf, sizeof(buf), "key is %s", "TEMP"); break;
-      case 4:
+      case Key_Time:
       snprintf(buf, sizeof(buf), "key is %s", "TIME"); break;
-      case 5:
+      case Key_Fan:
       snprintf(buf, sizeof(buf), "key is %s", "FAN "); break;
-      case 6:
+      case Key_R:
       snprintf(buf, sizeof(buf), "key is %s", "R   "); break;
-      case 7:
+      case Key_G:
       snprintf(buf, sizeof(buf), "key is %s", "G   "); break;
-      case 8:
+      case Key_B:
       snprintf(buf, sizeof(buf), "key is %s", "B   "); break;
       default:
       snprintf(buf, sizeof(buf), "key is %s", "NONE"); break;
@@ -212,6 +242,10 @@ void beep_state()
     HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_SET);
     HAL_Delay(300);
     HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
+
+    HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_SET);
+    HAL_Delay(300);
+    HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
     beep_active = RESET;
   }
   
@@ -219,7 +253,7 @@ void beep_state()
 
 void Power_led_state()
 {
-  if(num==6)
+  if(num==Key_R)
   {
     HAL_GPIO_WritePin(board_led_GPIO_Port, board_led_Pin, GPIO_PIN_SET);
   }
@@ -228,7 +262,7 @@ void Power_led_state()
     HAL_GPIO_WritePin(board_led_GPIO_Port, board_led_Pin, GPIO_PIN_RESET);
   }
 
-  if(num==7)
+  if(num==Key_G)
   {
     HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_SET);
   }
@@ -237,7 +271,7 @@ void Power_led_state()
     HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_RESET);
   }
 
-  if(num==8)
+  if(num==Key_B)
   {
     HAL_GPIO_WritePin(LED_B_GPIO_Port, LED_B_Pin, GPIO_PIN_SET);
   }
@@ -250,7 +284,7 @@ void Power_led_state()
 
 void fan_state()
 {
-  if(num==5)
+  if(num==Key_Fan)
   {
     HAL_GPIO_WritePin(FAN_IO_GPIO_Port, FAN_IO_Pin, GPIO_PIN_SET);
   }

@@ -83,6 +83,12 @@ void Error_Handler(void);
 #define DS18B20_GPIO_Port GPIOB
 #define D0_RGB_Pin GPIO_PIN_11
 #define D0_RGB_GPIO_Port GPIOB
+#define PaErTie_AIN1_Pin GPIO_PIN_12
+#define PaErTie_AIN1_GPIO_Port GPIOB
+#define PaErTie_AIN2_Pin GPIO_PIN_13
+#define PaErTie_AIN2_GPIO_Port GPIOB
+#define PaErTie_PWM_Pin GPIO_PIN_8
+#define PaErTie_PWM_GPIO_Port GPIOA
 #define FAN_IO_Pin GPIO_PIN_11
 #define FAN_IO_GPIO_Port GPIOA
 #define Beep_Pin GPIO_PIN_12
