@@ -54,6 +54,7 @@ void beep_state(void);
 void Power_led_state(void);
 void fan_state(void);
 void temp_state(void);
+void PaErTie_state(void);
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -145,6 +146,17 @@ void PaErTie_Stop()
   HAL_GPIO_WritePin(PaErTie_AIN2_GPIO_Port, PaErTie_AIN2_Pin, GPIO_PIN_RESET);
 }
 
+void PaErTie_state()
+{
+  if(num==Key_Cnt)
+  {
+    PaErTie_Run();
+  }
+  else
+  {
+    PaErTie_Stop();
+  }
+}
 
 void HuoEr_state()
 {
@@ -383,7 +395,8 @@ int main(void)
     Power_led_state();
     fan_state();
     moto_state();
-
+    PaErTie_state();
+    
     /* ── 100 ms temperature update + display ── */
     if (temp_tick)
     {
