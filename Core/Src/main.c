@@ -48,13 +48,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-void HuoEr_state(void);
-void key_state(void);
-void beep_state(void);
-void Power_led_state(void);
-void fan_state(void);
-void temp_state(void);
-void PaErTie_state(void);
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -69,9 +63,18 @@ uint32_t key_num = 0;
 uint32_t num_cnt = 0;
 uint8_t beep_active = RESET;
 uint8_t temp_tick = 0;
-uint32_t target_temp = 0;
-uint8_t Time_fen=0;
-uint8_t Time_miao=0;
+int32_t target_temp = 60;
+int8_t Time_fen=2;
+int8_t Time_miao=0;
+uint8_t target_temp_set_flag=RESET;
+uint8_t Time_set_flag=RESET;
+uint8_t Time_flag=0;
+uint8_t Temp_flag=0;
+uint8_t fan_state_flag=0;
+uint8_t R_led_flag=0;
+uint8_t G_led_flag=0;
+uint8_t B_led_flag=0;
+uint8_t now_temp=0;//当前温度
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -106,9 +109,9 @@ void moto2_stop()
   HAL_GPIO_WritePin(RGB_lvjing_BIN2_GPIO_Port, RGB_lvjing_BIN2_Pin, GPIO_PIN_SET);
 }
 
-void moto_state()
+void moto_ack()
 {
-  if(num==1)
+  if((num==Key_Add)&&(num==Key_Cnt))
   {
     moto1_run();
   }
@@ -117,7 +120,7 @@ void moto_state()
     moto1_stop();
   }
 
-  if(num==2)
+  if((num==Key_Cnt)&&(num==Key_Add))
   {
     moto2_run();
   }
@@ -146,15 +149,28 @@ void PaErTie_Stop()
   HAL_GPIO_WritePin(PaErTie_AIN2_GPIO_Port, PaErTie_AIN2_Pin, GPIO_PIN_RESET);
 }
 
-void PaErTie_state()
+void PaErTie_ack()
 {
-  if(num==Key_Cnt)
+  //if((target_temp_set_flag)&&(Time_set_flag)&&(target_temp>now_temp))
+  if(target_temp_set_flag==SET)
   {
-    PaErTie_Run();
+    if(Time_set_flag==SET)
+    {
+      if(target_temp>now_temp)
+      {
+        PaErTie_Run();
+        snprintf(buf, sizeof(buf), "+++", 1);
+        ssd1306_basic_string_no_update(120-30, 48, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+      }
+    }
   }
-  else
+  
+  if(target_temp<=now_temp)
   {
     PaErTie_Stop();
+    beep_active=SET;
+    snprintf(buf, sizeof(buf), "---", 1);
+    ssd1306_basic_string_no_update(120-30, 48, buf, (uint16_t)strlen(buf),1, SSD1306_FONT_12);
   }
 }
 
@@ -163,91 +179,192 @@ void HuoEr_state()
     if (HAL_GPIO_ReadPin(D0_LVJING_GPIO_Port, D0_LVJING_Pin) == GPIO_PIN_SET)
     {
       snprintf(buf, sizeof(buf), "HR1: %d", 1);
-      ssd1306_basic_string_no_update(0, 12, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+      ssd1306_basic_string_no_update(0, 12, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
     }
     else
     {
       snprintf(buf, sizeof(buf), "HR1: %d", 0);
-      ssd1306_basic_string_no_update(0, 12, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+      ssd1306_basic_string_no_update(0, 12, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
     }
 
     if (HAL_GPIO_ReadPin(D0_RGB_GPIO_Port, D0_RGB_Pin) == GPIO_PIN_SET)
     {
       snprintf(buf, sizeof(buf), "HR2: %d", 1);
-      ssd1306_basic_string_no_update(0, 24, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+      ssd1306_basic_string_no_update(6*8, 12, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
     }
     else
     {
       snprintf(buf, sizeof(buf), "HR2: %d", 0);
-      ssd1306_basic_string_no_update(0, 24, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+      ssd1306_basic_string_no_update(6*8, 12, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
     }
 }
 
-void key_state()
+void key_scan_and_display()
 {
     if (HAL_GPIO_ReadPin(KEY_ADD_GPIO_Port, KEY_ADD_Pin) == GPIO_PIN_RESET)
     {
-      num=Key_Add;
+      //num=Key_Add;
+      //key_add_flag++;
+      
+      if(Time_flag==1)
+      {
+        Time_fen++;
+        if(Time_fen>=120)
+        {
+          Time_fen=0;
+        }
+      }
+      else if(Time_flag==2)
+      {
+        Time_miao++;
+        if(Time_miao>=60)
+        {
+          Time_miao=0;
+          Time_fen++;
+        }
+      }
+      else if(Time_flag==3)
+      {
+        Time_flag=0;
+      }
+      
+
+      if(Temp_flag==1)
+      {
+        target_temp++;
+      }
+    while(!(HAL_GPIO_ReadPin(KEY_ADD_GPIO_Port, KEY_ADD_Pin) == GPIO_PIN_RESET));  
     }
     else if(HAL_GPIO_ReadPin(KEY_CNT_GPIO_Port, KEY_CNT_Pin) == GPIO_PIN_RESET)
     {
-      num=Key_Cnt;
-    }
+      //num=Key_Cnt;
+      
+      if(Time_flag==1)
+      {
+        Time_fen--;
+        if(Time_fen<=0)
+        {
+          Time_fen=0;
+        }
+      }
+      else if(Time_flag==2)
+      {
+        Time_miao--;
+        if(Time_miao<=0)
+        {
+          Time_miao=59;
+          Time_fen--;
+        }
+      }
+      else if(Time_flag==3)
+      {
+        Time_flag=0;
+      }
+      
+
+      if(Temp_flag==1)
+      {
+        target_temp--;
+        if(target_temp<=0)
+        {
+          target_temp=0;
+        }
+      }
+    while(!(HAL_GPIO_ReadPin(KEY_CNT_GPIO_Port, KEY_CNT_Pin) == GPIO_PIN_RESET));
+  }
+
     else if(HAL_GPIO_ReadPin(KEY_TEMP_GPIO_Port, KEY_TEMP_Pin) == GPIO_PIN_RESET)
     {
       num=Key_Temp;
+      Temp_flag++;
+      if(Temp_flag==2)
+      {
+        Temp_flag=0;
+        target_temp_set_flag=SET;
+      }
     }
     else if(HAL_GPIO_ReadPin(KEY_TIME_GPIO_Port, KEY_TIME_Pin) == GPIO_PIN_RESET)
     {
       num=Key_Time;
+      Time_flag++;
+      if(Time_flag==3)
+      {
+        Time_flag=0;
+        Time_set_flag=SET;
+      }
     }
+
     else if(HAL_GPIO_ReadPin(KEY_FAN_GPIO_Port, KEY_FAN_Pin) == GPIO_PIN_RESET)
     {
-      num=Key_Fan;
+      //num=Key_Fan;
+      fan_state_flag++;
+      if(fan_state_flag==2)
+      {
+        fan_state_flag=0;
+      }
+      while(!(HAL_GPIO_ReadPin(KEY_FAN_GPIO_Port, KEY_FAN_Pin) == GPIO_PIN_RESET));
     }
     else if(HAL_GPIO_ReadPin(KEY_R_GPIO_Port, KEY_R_Pin) == GPIO_PIN_RESET)
     {
-      num=Key_R;
+      //num=Key_R;
+      R_led_flag++;
+      if(R_led_flag==2)
+      {
+        R_led_flag=0;
+      }
+      while(!(HAL_GPIO_ReadPin(KEY_R_GPIO_Port, KEY_R_Pin) == GPIO_PIN_RESET));
     }
     else if(HAL_GPIO_ReadPin(KEY_G_GPIO_Port, KEY_G_Pin) == GPIO_PIN_RESET)
     {
-      num=Key_G;
+      //num=Key_G;
+      G_led_flag++;
+      if(G_led_flag==2)
+      {
+        G_led_flag=0;
+      }
+      while(!(HAL_GPIO_ReadPin(KEY_G_GPIO_Port, KEY_G_Pin) == GPIO_PIN_RESET));
     }
     else if(HAL_GPIO_ReadPin(KEY_B_GPIO_Port, KEY_B_Pin) == GPIO_PIN_RESET)
     {
-      num=Key_B;
-      beep_active=SET;
+      //num=Key_B;
+      //beep_active=SET;
+      B_led_flag++;
+      if(B_led_flag==2)
+      {
+        B_led_flag=0;
+      }
+      while(!(HAL_GPIO_ReadPin(KEY_B_GPIO_Port, KEY_B_Pin) == GPIO_PIN_RESET));
     }
     else
     {
       num=Key_None;
     }
 
-    switch(num)
-    {
-      case Key_Add:
-      snprintf(buf, sizeof(buf), "key is %s", "ADD "); break;
-      case Key_Cnt:
-      snprintf(buf, sizeof(buf), "key is %s", "CNT "); break;
-      case Key_Temp:
-      snprintf(buf, sizeof(buf), "key is %s", "TEMP"); break;
-      case Key_Time:
-      snprintf(buf, sizeof(buf), "key is %s", "TIME"); break;
-      case Key_Fan:
-      snprintf(buf, sizeof(buf), "key is %s", "FAN "); break;
-      case Key_R:
-      snprintf(buf, sizeof(buf), "key is %s", "R   "); break;
-      case Key_G:
-      snprintf(buf, sizeof(buf), "key is %s", "G   "); break;
-      case Key_B:
-      snprintf(buf, sizeof(buf), "key is %s", "B   "); break;
-      default:
-      snprintf(buf, sizeof(buf), "key is %s", "NONE"); break;
-    }
-    ssd1306_basic_string_no_update(0, 36, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+    // switch(num)
+    // {
+    //   case Key_Add:
+    //   snprintf(buf, sizeof(buf), "key is %s", "ADD "); break;
+    //   case Key_Cnt:
+    //   snprintf(buf, sizeof(buf), "key is %s", "CNT "); break;
+    //   case Key_Temp:
+    //   snprintf(buf, sizeof(buf), "key is %s", "TEMP"); break;
+    //   case Key_Time:
+    //   snprintf(buf, sizeof(buf), "key is %s", "TIME"); break;
+    //   case Key_Fan:
+    //   snprintf(buf, sizeof(buf), "key is %s", "FAN "); break;
+    //   case Key_R:
+    //   snprintf(buf, sizeof(buf), "key is %s", "R   "); break;
+    //   case Key_G:
+    //   snprintf(buf, sizeof(buf), "key is %s", "G   "); break;
+    //   case Key_B:
+    //   snprintf(buf, sizeof(buf), "key is %s", "B   "); break;
+    //   default:
+    //   snprintf(buf, sizeof(buf), "key is %s", "NONE"); break;
+    // }
+    // ssd1306_basic_string_no_update(0, 24, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
 }
 
-void beep_state()
+void beep_ack()
 {
   if(beep_active == SET)
   {
@@ -263,9 +380,9 @@ void beep_state()
   
 }
 
-void Power_led_state()
+void Power_led_ack()
 {
-  if(num==Key_R)
+  if(R_led_flag)
   {
     HAL_GPIO_WritePin(board_led_GPIO_Port, board_led_Pin, GPIO_PIN_SET);
   }
@@ -274,7 +391,7 @@ void Power_led_state()
     HAL_GPIO_WritePin(board_led_GPIO_Port, board_led_Pin, GPIO_PIN_RESET);
   }
 
-  if(num==Key_G)
+  if(G_led_flag)
   {
     HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_SET);
   }
@@ -283,7 +400,7 @@ void Power_led_state()
     HAL_GPIO_WritePin(LED_G_GPIO_Port, LED_G_Pin, GPIO_PIN_RESET);
   }
 
-  if(num==Key_B)
+  if(B_led_flag)
   {
     HAL_GPIO_WritePin(LED_B_GPIO_Port, LED_B_Pin, GPIO_PIN_SET);
   }
@@ -294,9 +411,9 @@ void Power_led_state()
 
 }
 
-void fan_state()
+void fan_ack()
 {
-  if(num==Key_Fan)
+  if(fan_state_flag==1)
   {
     HAL_GPIO_WritePin(FAN_IO_GPIO_Port, FAN_IO_Pin, GPIO_PIN_SET);
   }
@@ -306,7 +423,7 @@ void fan_state()
   }
 }
 
-void temp_state()
+void temp_state_and_display()
 {
   char tbuf[20];
   int16_t val = DS18B20_GetTempTenths();
@@ -323,8 +440,43 @@ void temp_state()
     uint8_t dec_part = (uint8_t)(val % 10);
     snprintf(tbuf, sizeof(tbuf), "TEMP:%c%d.%d C",
              neg ? '-' : ' ', int_part, dec_part);
+    now_temp=int_part;
   }
-  ssd1306_basic_string_no_update(0, 48, tbuf, (uint16_t)strlen(tbuf), 0, SSD1306_FONT_12);
+  ssd1306_basic_string_no_update(0, 48, tbuf, (uint16_t)strlen(tbuf), 1, SSD1306_FONT_12);
+}
+
+void Time_dis()
+{
+  snprintf(buf, sizeof(buf), "T:%02d:%02d", Time_fen, Time_miao);
+  ssd1306_basic_string_no_update(60, 0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+
+  if(Time_set_flag==SET)
+  {
+    snprintf(buf, sizeof(buf), " ");
+    ssd1306_basic_string_no_update(60+7*8, 0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+  }
+  else
+  {
+    snprintf(buf, sizeof(buf), "*");
+    ssd1306_basic_string_no_update(60+7*8, 0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+  }
+}
+
+void Target_temp_dis()
+{
+  snprintf(buf, sizeof(buf), "TARGET:%d C", target_temp);
+  ssd1306_basic_string_no_update(0, 36, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+
+  if(target_temp_set_flag==SET)
+  {
+    snprintf(buf, sizeof(buf), " ");
+    ssd1306_basic_string_no_update(10*8, 36, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+  }
+  else
+  {
+    snprintf(buf, sizeof(buf), "*");
+    ssd1306_basic_string_no_update(10*8, 36, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+  }
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
@@ -337,6 +489,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         {
             led_cnt = 0;
             num_cnt++;
+
         }
     }
 }
@@ -386,24 +539,26 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    snprintf(buf, sizeof(buf), "num is %ld", num_cnt);
-    ssd1306_basic_string_no_update(0, 0, buf, (uint16_t)strlen(buf), 0, SSD1306_FONT_12);
+    beep_ack();
+    Power_led_ack();
+    fan_ack();
+    moto_ack();
+    PaErTie_ack();
 
+    // snprintf(buf, sizeof(buf), "num is %ld", num_cnt);
+    // ssd1306_basic_string_no_update(0, 0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
     HuoEr_state();
-    key_state();
-    beep_state();
-    Power_led_state();
-    fan_state();
-    moto_state();
-    PaErTie_state();
-    
+    key_scan_and_display();
+    Target_temp_dis();
     /* ── 100 ms temperature update + display ── */
     if (temp_tick)
     {
         DS18B20_Process();
         temp_tick = 0;
     }
-    temp_state();
+    temp_state_and_display();
+
+    Time_dis();
 
     /* single GRAM flush per loop — all display writes above use _no_update */
     ssd1306_basic_gram_update();
