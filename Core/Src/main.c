@@ -61,7 +61,6 @@ uint32_t led_cnt = 0;
 uint32_t num = 0;
 uint32_t key_num = 0;
 uint32_t num_cnt = 0;
-uint8_t beep_active = RESET;
 uint8_t temp_tick = 0;
 int32_t target_temp = 45;
 int8_t Time_fen=0;
@@ -75,6 +74,15 @@ uint8_t R_led_flag=0;
 uint8_t G_led_flag=0;
 uint8_t B_led_flag=0;
 uint8_t now_temp=0;//当前温度
+
+typedef enum {
+    STATE_IDLE,       /* 等待用户设置温度和時間 */
+    STATE_HEATING,    /* 加热中：帕尔贴运行，等待温度达标 */
+    STATE_COUNTDOWN,  /* 倒计时中：温度达标，时间递减 */
+    STATE_ALERT       /* 蜂鸣提示中：响完后回到 IDLE */
+} SystemState;
+SystemState sys_state = STATE_IDLE;
+uint8_t beep_timer = 0;  /* 蜂鸣器 100ms 节拍计数器 */
 
 /* USER CODE END PV */
 
@@ -152,28 +160,49 @@ void PaErTie_Stop()
 
 void PaErTie_ack()
 {
-  if(target_temp_set_flag==SET)
-  {
-    if(Time_set_flag==SET)
+    switch(sys_state)
     {
-      if(target_temp>now_temp)
-      {
-        PaErTie_Run();
-        snprintf(buf, sizeof(buf), "RUN ");
-        ssd1306_basic_string_no_update(120-30, 48, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
-      }
+        case STATE_IDLE:
+            /* 等待温度和時間都确认后进入加热状态 */
+            if(target_temp_set_flag == SET && Time_set_flag == SET)
+            {
+                sys_state = STATE_HEATING;
+            }
+            break;
+
+        case STATE_HEATING:
+            if(target_temp > now_temp)
+            {
+                PaErTie_Run();
+                snprintf(buf, sizeof(buf), "RUN ");
+                ssd1306_basic_string_no_update(120-30, 48, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+            }
+            else
+            {
+                /* 温度达标，停止加热，进入倒计时 */
+                PaErTie_Stop();
+                sys_state = STATE_COUNTDOWN;
+                snprintf(buf, sizeof(buf), "STOP");
+                ssd1306_basic_string_no_update(120-30, 48, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+            }
+            break;
+
+        case STATE_COUNTDOWN:
+            PaErTie_Stop();
+            if(target_temp > now_temp)
+            {
+                /* 倒计时期间温度掉落，重新加热保持温度 */
+                sys_state = STATE_HEATING;
+            }
+            snprintf(buf, sizeof(buf), "STOP");
+            ssd1306_basic_string_no_update(120-30, 48, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+            break;
+
+        case STATE_ALERT:
+            PaErTie_Stop();
+            /* 蜂鸣器时序在定时器回调中处理 */
+            break;
     }
-  }
-  
-  if(target_temp<=now_temp)
-  {
-    PaErTie_Stop();
-    beep_active=SET;
-    snprintf(buf, sizeof(buf), "STOP");
-    ssd1306_basic_string_no_update(120-30, 48, buf, (uint16_t)strlen(buf),1, SSD1306_FONT_12);
-    target_temp_set_flag=RESET;
-    Time_set_flag=RESET;
-  }
 }
 
 void HuoEr_state()
@@ -221,91 +250,150 @@ void key_scan_and_display()
 {
     if (HAL_GPIO_ReadPin(KEY_ADD_GPIO_Port, KEY_ADD_Pin) == GPIO_PIN_RESET)
     {
-      num=Key_Add;
-      if(Time_flag==1)
+      HAL_Delay(30);  /* 按下消抖 */
+      if (HAL_GPIO_ReadPin(KEY_ADD_GPIO_Port, KEY_ADD_Pin) == GPIO_PIN_RESET)
       {
-        Time_fen++;
-        if(Time_fen>=120)
+        num=Key_Add;
+        /* 首次按下立即响应 */
+        if(Time_flag==1)
         {
-          Time_fen=0;
-        }
-      }
-      if(Time_flag==2)
-      {
-        Time_miao++;
-        if(Time_miao>=60)
-        {
-          Time_miao=0;
           Time_fen++;
+          if(Time_fen>=120) Time_fen=0;
         }
-      }      
+        if(Time_flag==2)
+        {
+          Time_miao++;
+          if(Time_miao>=60) { Time_miao=0; Time_fen++; }
+        }
+        if(Temp_flag==1)
+        {
+          target_temp++;
+        }
 
-      if(Temp_flag==1)
-      {
-        target_temp++;
+        /* 长按自动重复：500ms 后每 100ms 触发一次 */
+        uint32_t last_led = led_cnt;
+        uint8_t  hold_ticks = 0;
+        while(HAL_GPIO_ReadPin(KEY_ADD_GPIO_Port, KEY_ADD_Pin) == GPIO_PIN_RESET)
+        {
+          if(led_cnt != last_led)
+          {
+            last_led = led_cnt;
+            hold_ticks++;
+            if(hold_ticks >= 5)  /* 500ms 初始延迟 */
+            {
+              if(Time_flag==1)
+              {
+                Time_fen++;
+                if(Time_fen>=120) Time_fen=0;
+              }
+              if(Time_flag==2)
+              {
+                Time_miao++;
+                if(Time_miao>=60) { Time_miao=0; Time_fen++; }
+              }
+              if(Temp_flag==1)
+              {
+                target_temp++;
+              }
+            }
+          }
+        }
+        HAL_Delay(30);  /* 释放消抖 */
       }
-    while(!(HAL_GPIO_ReadPin(KEY_ADD_GPIO_Port, KEY_ADD_Pin) == GPIO_PIN_RESET));  
     }
 
     else if(HAL_GPIO_ReadPin(KEY_CNT_GPIO_Port, KEY_CNT_Pin) == GPIO_PIN_RESET)
-    {     
-      num=Key_Cnt; 
-      if(Time_flag==1)
+    {
+      HAL_Delay(30);  /* 按下消抖 */
+      if (HAL_GPIO_ReadPin(KEY_CNT_GPIO_Port, KEY_CNT_Pin) == GPIO_PIN_RESET)
       {
-        Time_fen--;
-        if(Time_fen<=0)
+        num=Key_Cnt;
+        /* 首次按下立即响应 */
+        if(Time_flag==1)
         {
-          Time_fen=0;
-        }
-      }
-      if(Time_flag==2)
-      {
-        Time_miao--;
-        if(Time_miao<=0)
-        {
-          Time_miao=59;
           Time_fen--;
+          if(Time_fen<=0) Time_fen=0;
         }
-      }
-      
-
-      if(Temp_flag==1)
-      {
-        target_temp--;
-        if(target_temp<=0)
+        if(Time_flag==2)
         {
-          target_temp=0;
+          Time_miao--;
+          if(Time_miao<=0) { Time_miao=59; Time_fen--; }
         }
+        if(Temp_flag==1)
+        {
+          target_temp--;
+          if(target_temp<=0) target_temp=0;
+        }
+
+        /* 长按自动重复：500ms 后每 100ms 触发一次 */
+        uint32_t last_led = led_cnt;
+        uint8_t  hold_ticks = 0;
+        while(HAL_GPIO_ReadPin(KEY_CNT_GPIO_Port, KEY_CNT_Pin) == GPIO_PIN_RESET)
+        {
+          if(led_cnt != last_led)
+          {
+            last_led = led_cnt;
+            hold_ticks++;
+            if(hold_ticks >= 5)  /* 500ms 初始延迟 */
+            {
+              if(Time_flag==1)
+              {
+                Time_fen--;
+                if(Time_fen<=0) Time_fen=0;
+              }
+              if(Time_flag==2)
+              {
+                Time_miao--;
+                if(Time_miao<=0) { Time_miao=59; Time_fen--; }
+              }
+              if(Temp_flag==1)
+              {
+                target_temp--;
+                if(target_temp<=0) target_temp=0;
+              }
+            }
+          }
+        }
+        HAL_Delay(30);  /* 释放消抖 */
       }
-    while(!(HAL_GPIO_ReadPin(KEY_CNT_GPIO_Port, KEY_CNT_Pin) == GPIO_PIN_RESET));
-  }
+    }
 
     else if(HAL_GPIO_ReadPin(KEY_TEMP_GPIO_Port, KEY_TEMP_Pin) == GPIO_PIN_RESET)
     {
-
-      num=Key_Temp;
-      while(!(HAL_GPIO_ReadPin(KEY_TEMP_GPIO_Port, KEY_TEMP_Pin) == GPIO_PIN_RESET));
-      Temp_flag++;  
-      if(Temp_flag==2)
+      HAL_Delay(30);  /* 按下消抖 */
+      if(HAL_GPIO_ReadPin(KEY_TEMP_GPIO_Port, KEY_TEMP_Pin) == GPIO_PIN_RESET)
       {
-        Temp_flag=0;
-        target_temp_set_flag=SET;
+        num=Key_Temp;
+        if(sys_state == STATE_IDLE)
+        {
+          Temp_flag++;
+          if(Temp_flag==2)
+          {
+            Temp_flag=0;
+            target_temp_set_flag=SET;
+          }
+        }
+        while(!(HAL_GPIO_ReadPin(KEY_TEMP_GPIO_Port, KEY_TEMP_Pin) == GPIO_PIN_RESET));
+        HAL_Delay(30);  /* 释放消抖 */
       }
     }
     else if(HAL_GPIO_ReadPin(KEY_TIME_GPIO_Port, KEY_TIME_Pin) == GPIO_PIN_RESET)
     {
-      num=Key_Time;
-      
-      HAL_Delay(50); // 消抖延时
+      HAL_Delay(30);  /* 按下消抖 */
       if(HAL_GPIO_ReadPin(KEY_TIME_GPIO_Port, KEY_TIME_Pin) == GPIO_PIN_RESET)
       {
+        num=Key_Time;
+        if(sys_state == STATE_IDLE)
+        {
+          Time_flag++;
+        }
+        if(Time_flag==3)
+        {
+          Time_flag=0;
+          Time_set_flag=SET;
+        }
         while(!(HAL_GPIO_ReadPin(KEY_TIME_GPIO_Port, KEY_TIME_Pin) == GPIO_PIN_RESET));
-        Time_flag++;   
-      }
-      if(Time_flag==3)
-      {
-        Time_flag=0;
-        Time_set_flag=SET;
+        HAL_Delay(30);  /* 释放消抖 */
       }
     }
 
@@ -380,18 +468,9 @@ void key_scan_and_display()
 
 void beep_ack()
 {
-  if(beep_active == SET)
-  {
-    HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_SET);
-    HAL_Delay(300);
-    HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
-
-    HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_SET);
-    HAL_Delay(300);
-    HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
-    beep_active = RESET;
-  }
-  
+    /* 蜂鸣器时序已在 HAL_TIM_PeriodElapsedCallback 中通过
+       STATE_ALERT 状态机非阻塞处理（5 声短鸣，每声 200ms）。
+       本函数保留以兼容主循环调用。 */
 }
 
 void Power_led_ack()
@@ -462,7 +541,7 @@ void temp_state_and_display()
 void Time_dis()
 {
   snprintf(buf, sizeof(buf), "T:%02d:%02d", Time_fen, Time_miao);
-  ssd1306_basic_string_no_update(60, 0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+  ssd1306_basic_string_no_update(0, 0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
 }
 
 void Target_temp_dis()
@@ -484,18 +563,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             if(Temp_flag==1)
             {
               snprintf(buf, sizeof(buf), "--");
-              ssd1306_basic_string_no_update(5*8+5,36, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+              ssd1306_basic_string_no_update(42, 36, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
             }
 
             if(Time_flag==1)
             {
               snprintf(buf, sizeof(buf), "--");
-              ssd1306_basic_string_no_update(58+2*8,0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+              ssd1306_basic_string_no_update(12, 0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
             }
             if(Time_flag==2)
             {
               snprintf(buf, sizeof(buf), "--");
-              ssd1306_basic_string_no_update(58+3*8+8,0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+              ssd1306_basic_string_no_update(30, 0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
             }
           }
 
@@ -504,23 +583,50 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             led_cnt = 0;
             num_cnt++;
 
-            if(now_temp>=target_temp)
+            /* ── 倒计时：仅在 COUNTDOWN 状态下执行 ── */
+            if(sys_state == STATE_COUNTDOWN)
             {
-              if((Time_fen!=0)&&(Time_miao!=0))
-              {
-                Time_miao--;
-              } 
-              if(Time_miao<=0)
-              {
-                Time_miao=59;
-                Time_fen--;
-              }
-
-              if((Time_fen==0)&&(Time_miao==0))
+                if(Time_miao > 0)
                 {
-                  beep_active = SET;
+                    Time_miao--;
                 }
-                
+                else if(Time_fen > 0)
+                {
+                    Time_fen--;
+                    Time_miao = 59;
+                }
+
+                /* 倒计时归零 → 进入蜂鸣提示 */
+                if(Time_fen == 0 && Time_miao == 0)
+                {
+                    sys_state = STATE_ALERT;
+                    beep_timer = 0;
+                }
+            }
+
+            /* ── 蜂鸣器：ALERT 状态下非阻塞 5 声短鸣 ── */
+            if(sys_state == STATE_ALERT)
+            {
+                beep_timer++;
+                uint8_t cycle = beep_timer / 2;  /* 200ms 一个半周期 */
+
+                if(cycle >= 10)  /* 5 声 = 10 个半周期 (5 ON + 5 OFF) */
+                {
+                    HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
+                    beep_timer = 0;
+                    /* 本轮结束，复位标志，准备下一轮 */
+                    target_temp_set_flag = RESET;
+                    Time_set_flag = RESET;
+                    sys_state = STATE_IDLE;
+                }
+                else if(cycle % 2 == 0)  /* ON 相位 */
+                {
+                    HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_SET);
+                }
+                else  /* OFF 相位 */
+                {
+                    HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
+                }
             }
           }
     }
