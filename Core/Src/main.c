@@ -159,7 +159,7 @@ void PaErTie_ack()
       if(target_temp>now_temp)
       {
         PaErTie_Run();
-        snprintf(buf, sizeof(buf), "+++", 1);
+        snprintf(buf, sizeof(buf), "+++");
         ssd1306_basic_string_no_update(120-30, 48, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
       }
     }
@@ -169,8 +169,10 @@ void PaErTie_ack()
   {
     PaErTie_Stop();
     beep_active=SET;
-    snprintf(buf, sizeof(buf), "---", 1);
+    snprintf(buf, sizeof(buf), "---");
     ssd1306_basic_string_no_update(120-30, 48, buf, (uint16_t)strlen(buf),1, SSD1306_FONT_12);
+    target_temp_set_flag=RESET;
+    Time_set_flag=RESET;
   }
 }
 
@@ -199,13 +201,27 @@ void HuoEr_state()
     }
 }
 
+
+void is_or_dis_xinghao_dis()
+{
+      if(Temp_flag==2)
+      {
+        Temp_flag=0;
+        target_temp_set_flag=SET;
+      }
+
+      if(Time_flag==3)
+      {
+        Time_flag=0;
+        Time_set_flag=SET;
+      }
+}
+
 void key_scan_and_display()
 {
     if (HAL_GPIO_ReadPin(KEY_ADD_GPIO_Port, KEY_ADD_Pin) == GPIO_PIN_RESET)
     {
-      //num=Key_Add;
-      //key_add_flag++;
-      
+      num=Key_Add;
       if(Time_flag==1)
       {
         Time_fen++;
@@ -235,10 +251,10 @@ void key_scan_and_display()
       }
     while(!(HAL_GPIO_ReadPin(KEY_ADD_GPIO_Port, KEY_ADD_Pin) == GPIO_PIN_RESET));  
     }
+
     else if(HAL_GPIO_ReadPin(KEY_CNT_GPIO_Port, KEY_CNT_Pin) == GPIO_PIN_RESET)
-    {
-      //num=Key_Cnt;
-      
+    {     
+      num=Key_Cnt; 
       if(Time_flag==1)
       {
         Time_fen--;
@@ -255,10 +271,6 @@ void key_scan_and_display()
           Time_miao=59;
           Time_fen--;
         }
-      }
-      else if(Time_flag==3)
-      {
-        Time_flag=0;
       }
       
 
@@ -282,6 +294,7 @@ void key_scan_and_display()
         Temp_flag=0;
         target_temp_set_flag=SET;
       }
+      while(!(HAL_GPIO_ReadPin(KEY_TEMP_GPIO_Port, KEY_TEMP_Pin) == GPIO_PIN_RESET));
     }
     else if(HAL_GPIO_ReadPin(KEY_TIME_GPIO_Port, KEY_TIME_Pin) == GPIO_PIN_RESET)
     {
@@ -292,11 +305,12 @@ void key_scan_and_display()
         Time_flag=0;
         Time_set_flag=SET;
       }
+      while(!(HAL_GPIO_ReadPin(KEY_TIME_GPIO_Port, KEY_TIME_Pin) == GPIO_PIN_RESET));
     }
 
     else if(HAL_GPIO_ReadPin(KEY_FAN_GPIO_Port, KEY_FAN_Pin) == GPIO_PIN_RESET)
     {
-      //num=Key_Fan;
+      num=Key_Fan;
       fan_state_flag++;
       if(fan_state_flag==2)
       {
@@ -306,7 +320,7 @@ void key_scan_and_display()
     }
     else if(HAL_GPIO_ReadPin(KEY_R_GPIO_Port, KEY_R_Pin) == GPIO_PIN_RESET)
     {
-      //num=Key_R;
+      num=Key_R;
       R_led_flag++;
       if(R_led_flag==2)
       {
@@ -316,7 +330,7 @@ void key_scan_and_display()
     }
     else if(HAL_GPIO_ReadPin(KEY_G_GPIO_Port, KEY_G_Pin) == GPIO_PIN_RESET)
     {
-      //num=Key_G;
+      num=Key_G;
       G_led_flag++;
       if(G_led_flag==2)
       {
@@ -326,8 +340,7 @@ void key_scan_and_display()
     }
     else if(HAL_GPIO_ReadPin(KEY_B_GPIO_Port, KEY_B_Pin) == GPIO_PIN_RESET)
     {
-      //num=Key_B;
-      //beep_active=SET;
+      num=Key_B;
       B_led_flag++;
       if(B_led_flag==2)
       {
@@ -340,28 +353,28 @@ void key_scan_and_display()
       num=Key_None;
     }
 
-    // switch(num)
-    // {
-    //   case Key_Add:
-    //   snprintf(buf, sizeof(buf), "key is %s", "ADD "); break;
-    //   case Key_Cnt:
-    //   snprintf(buf, sizeof(buf), "key is %s", "CNT "); break;
-    //   case Key_Temp:
-    //   snprintf(buf, sizeof(buf), "key is %s", "TEMP"); break;
-    //   case Key_Time:
-    //   snprintf(buf, sizeof(buf), "key is %s", "TIME"); break;
-    //   case Key_Fan:
-    //   snprintf(buf, sizeof(buf), "key is %s", "FAN "); break;
-    //   case Key_R:
-    //   snprintf(buf, sizeof(buf), "key is %s", "R   "); break;
-    //   case Key_G:
-    //   snprintf(buf, sizeof(buf), "key is %s", "G   "); break;
-    //   case Key_B:
-    //   snprintf(buf, sizeof(buf), "key is %s", "B   "); break;
-    //   default:
-    //   snprintf(buf, sizeof(buf), "key is %s", "NONE"); break;
-    // }
-    // ssd1306_basic_string_no_update(0, 24, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+    switch(num)
+    {
+      case Key_Add:
+      snprintf(buf, sizeof(buf), "key is %s", "ADD "); break;
+      case Key_Cnt:
+      snprintf(buf, sizeof(buf), "key is %s", "CNT "); break;
+      case Key_Temp:
+      snprintf(buf, sizeof(buf), "key is %s", "TEMP"); break;
+      case Key_Time:
+      snprintf(buf, sizeof(buf), "key is %s", "TIME"); break;
+      case Key_Fan:
+      snprintf(buf, sizeof(buf), "key is %s", "FAN "); break;
+      case Key_R:
+      snprintf(buf, sizeof(buf), "key is %s", "R   "); break;
+      case Key_G:
+      snprintf(buf, sizeof(buf), "key is %s", "G   "); break;
+      case Key_B:
+      snprintf(buf, sizeof(buf), "key is %s", "B   "); break;
+      default:
+      snprintf(buf, sizeof(buf), "key is %s", "NONE"); break;
+    }
+    ssd1306_basic_string_no_update(0, 24, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
 }
 
 void beep_ack()
@@ -483,12 +496,29 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if(htim->Instance == TIM1)
     {
+        
         led_cnt++;
         temp_tick = 1;                    /* 100 ms temperature update flag */
         if(led_cnt >= 10)
         {
             led_cnt = 0;
             num_cnt++;
+            if(Temp_flag==1)
+            {
+              snprintf(buf, sizeof(buf), "$$");
+              ssd1306_basic_string(5*8,36, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+            }
+
+            if(Time_flag==1)
+            {
+              snprintf(buf, sizeof(buf), "$$");
+              ssd1306_basic_string(60+1*8,0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+            }
+            if(Time_flag==2)
+            {
+              snprintf(buf, sizeof(buf), "$$");
+              ssd1306_basic_string(60+3*8+8,0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+            }
 
         }
     }
@@ -548,7 +578,6 @@ int main(void)
     // snprintf(buf, sizeof(buf), "num is %ld", num_cnt);
     // ssd1306_basic_string_no_update(0, 0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
     HuoEr_state();
-    key_scan_and_display();
     Target_temp_dis();
     /* ── 100 ms temperature update + display ── */
     if (temp_tick)
@@ -559,7 +588,8 @@ int main(void)
     temp_state_and_display();
 
     Time_dis();
-
+//    is_or_dis_xinghao_dis();
+    key_scan_and_display();
     /* single GRAM flush per loop — all display writes above use _no_update */
     ssd1306_basic_gram_update();
     /* USER CODE END WHILE */
