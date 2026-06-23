@@ -63,9 +63,9 @@ uint32_t key_num = 0;
 uint32_t num_cnt = 0;
 uint8_t beep_active = RESET;
 uint8_t temp_tick = 0;
-int32_t target_temp = 60;
-int8_t Time_fen=2;
-int8_t Time_miao=0;
+int32_t target_temp = 45;
+int8_t Time_fen=0;
+int8_t Time_miao=10;
 uint8_t target_temp_set_flag=RESET;
 uint8_t Time_set_flag=RESET;
 uint8_t Time_flag=0;
@@ -75,6 +75,7 @@ uint8_t R_led_flag=0;
 uint8_t G_led_flag=0;
 uint8_t B_led_flag=0;
 uint8_t now_temp=0;//当前温度
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -111,7 +112,7 @@ void moto2_stop()
 
 void moto_ack()
 {
-  if((num==Key_Add)&&(num==Key_Cnt))
+  if((num==Key_R))
   {
     moto1_run();
   }
@@ -120,7 +121,7 @@ void moto_ack()
     moto1_stop();
   }
 
-  if((num==Key_Cnt)&&(num==Key_Add))
+  if((num==Key_G))
   {
     moto2_run();
   }
@@ -151,7 +152,6 @@ void PaErTie_Stop()
 
 void PaErTie_ack()
 {
-  //if((target_temp_set_flag)&&(Time_set_flag)&&(target_temp>now_temp))
   if(target_temp_set_flag==SET)
   {
     if(Time_set_flag==SET)
@@ -159,7 +159,7 @@ void PaErTie_ack()
       if(target_temp>now_temp)
       {
         PaErTie_Run();
-        snprintf(buf, sizeof(buf), "+++");
+        snprintf(buf, sizeof(buf), "RUN ");
         ssd1306_basic_string_no_update(120-30, 48, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
       }
     }
@@ -169,7 +169,7 @@ void PaErTie_ack()
   {
     PaErTie_Stop();
     beep_active=SET;
-    snprintf(buf, sizeof(buf), "---");
+    snprintf(buf, sizeof(buf), "STOP");
     ssd1306_basic_string_no_update(120-30, 48, buf, (uint16_t)strlen(buf),1, SSD1306_FONT_12);
     target_temp_set_flag=RESET;
     Time_set_flag=RESET;
@@ -202,20 +202,20 @@ void HuoEr_state()
 }
 
 
-void is_or_dis_xinghao_dis()
-{
-      if(Temp_flag==2)
-      {
-        Temp_flag=0;
-        target_temp_set_flag=SET;
-      }
+// void is_or_dis_xinghao_dis()
+// {
+//       if(Temp_flag==2)
+//       {
+//         Temp_flag=0;
+//         target_temp_set_flag=SET;
+//       }
 
-      if(Time_flag==3)
-      {
-        Time_flag=0;
-        Time_set_flag=SET;
-      }
-}
+//       if(Time_flag==3)
+//       {
+//         Time_flag=0;
+//         Time_set_flag=SET;
+//       }
+// }
 
 void key_scan_and_display()
 {
@@ -230,7 +230,7 @@ void key_scan_and_display()
           Time_fen=0;
         }
       }
-      else if(Time_flag==2)
+      if(Time_flag==2)
       {
         Time_miao++;
         if(Time_miao>=60)
@@ -238,12 +238,7 @@ void key_scan_and_display()
           Time_miao=0;
           Time_fen++;
         }
-      }
-      else if(Time_flag==3)
-      {
-        Time_flag=0;
-      }
-      
+      }      
 
       if(Temp_flag==1)
       {
@@ -263,7 +258,7 @@ void key_scan_and_display()
           Time_fen=0;
         }
       }
-      else if(Time_flag==2)
+      if(Time_flag==2)
       {
         Time_miao--;
         if(Time_miao<=0)
@@ -287,25 +282,31 @@ void key_scan_and_display()
 
     else if(HAL_GPIO_ReadPin(KEY_TEMP_GPIO_Port, KEY_TEMP_Pin) == GPIO_PIN_RESET)
     {
+
       num=Key_Temp;
-      Temp_flag++;
+      while(!(HAL_GPIO_ReadPin(KEY_TEMP_GPIO_Port, KEY_TEMP_Pin) == GPIO_PIN_RESET));
+      Temp_flag++;  
       if(Temp_flag==2)
       {
         Temp_flag=0;
         target_temp_set_flag=SET;
       }
-      while(!(HAL_GPIO_ReadPin(KEY_TEMP_GPIO_Port, KEY_TEMP_Pin) == GPIO_PIN_RESET));
     }
     else if(HAL_GPIO_ReadPin(KEY_TIME_GPIO_Port, KEY_TIME_Pin) == GPIO_PIN_RESET)
     {
       num=Key_Time;
-      Time_flag++;
+      
+      HAL_Delay(50); // 消抖延时
+      if(HAL_GPIO_ReadPin(KEY_TIME_GPIO_Port, KEY_TIME_Pin) == GPIO_PIN_RESET)
+      {
+        while(!(HAL_GPIO_ReadPin(KEY_TIME_GPIO_Port, KEY_TIME_Pin) == GPIO_PIN_RESET));
+        Time_flag++;   
+      }
       if(Time_flag==3)
       {
         Time_flag=0;
         Time_set_flag=SET;
       }
-      while(!(HAL_GPIO_ReadPin(KEY_TIME_GPIO_Port, KEY_TIME_Pin) == GPIO_PIN_RESET));
     }
 
     else if(HAL_GPIO_ReadPin(KEY_FAN_GPIO_Port, KEY_FAN_Pin) == GPIO_PIN_RESET)
@@ -462,34 +463,12 @@ void Time_dis()
 {
   snprintf(buf, sizeof(buf), "T:%02d:%02d", Time_fen, Time_miao);
   ssd1306_basic_string_no_update(60, 0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
-
-  if(Time_set_flag==SET)
-  {
-    snprintf(buf, sizeof(buf), " ");
-    ssd1306_basic_string_no_update(60+7*8, 0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
-  }
-  else
-  {
-    snprintf(buf, sizeof(buf), "*");
-    ssd1306_basic_string_no_update(60+7*8, 0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
-  }
 }
 
 void Target_temp_dis()
 {
   snprintf(buf, sizeof(buf), "TARGET:%d C", target_temp);
   ssd1306_basic_string_no_update(0, 36, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
-
-  if(target_temp_set_flag==SET)
-  {
-    snprintf(buf, sizeof(buf), " ");
-    ssd1306_basic_string_no_update(10*8, 36, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
-  }
-  else
-  {
-    snprintf(buf, sizeof(buf), "*");
-    ssd1306_basic_string_no_update(10*8, 36, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
-  }
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
@@ -499,28 +478,51 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         
         led_cnt++;
         temp_tick = 1;                    /* 100 ms temperature update flag */
-        if(led_cnt >= 10)
-        {
-            led_cnt = 0;
-            num_cnt++;
+
+          if(led_cnt%5==0)
+          {
             if(Temp_flag==1)
             {
-              snprintf(buf, sizeof(buf), "$$");
-              ssd1306_basic_string(5*8,36, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+              snprintf(buf, sizeof(buf), "--");
+              ssd1306_basic_string_no_update(5*8+5,36, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
             }
 
             if(Time_flag==1)
             {
-              snprintf(buf, sizeof(buf), "$$");
-              ssd1306_basic_string(60+1*8,0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+              snprintf(buf, sizeof(buf), "--");
+              ssd1306_basic_string_no_update(58+2*8,0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
             }
             if(Time_flag==2)
             {
-              snprintf(buf, sizeof(buf), "$$");
-              ssd1306_basic_string(60+3*8+8,0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
+              snprintf(buf, sizeof(buf), "--");
+              ssd1306_basic_string_no_update(58+3*8+8,0, buf, (uint16_t)strlen(buf), 1, SSD1306_FONT_12);
             }
+          }
 
-        }
+        if(led_cnt >= 10)
+        {
+            led_cnt = 0;
+            num_cnt++;
+
+            if(now_temp>=target_temp)
+            {
+              if((Time_fen!=0)&&(Time_miao!=0))
+              {
+                Time_miao--;
+              } 
+              if(Time_miao<=0)
+              {
+                Time_miao=59;
+                Time_fen--;
+              }
+
+              if((Time_fen==0)&&(Time_miao==0))
+                {
+                  beep_active = SET;
+                }
+                
+            }
+          }
     }
 }
 /* USER CODE END 0 */
@@ -559,6 +561,7 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
   HAL_TIM_Base_Start_IT(&htim1);
   ssd1306_basic_init(SSD1306_INTERFACE_IIC, SSD1306_ADDR_SA0_0);
   ssd1306_basic_display_on();
