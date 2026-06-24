@@ -44,6 +44,8 @@
 #define Key_R 6
 #define Key_G 7
 #define Key_B 8
+#define hour 60
+#define Max_time_fen 5*hour
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -258,7 +260,7 @@ void key_scan_and_display()
         if(Time_flag==1)
         {
           Time_fen++;
-          if(Time_fen>=120) Time_fen=0;
+          if(Time_fen>=Max_time_fen) Time_fen=0;
         }
         if(Time_flag==2)
         {
@@ -284,7 +286,7 @@ void key_scan_and_display()
               if(Time_flag==1)
               {
                 Time_fen++;
-                if(Time_fen>=120) Time_fen=0;
+                if(Time_fen>=Max_time_fen) Time_fen=0;
               }
               if(Time_flag==2)
               {
@@ -603,7 +605,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     beep_timer = 0;
                 }
             }
-
+            /* ── 蜂鸣器：HEAT 状态下非阻塞 2 声短鸣 ── */
+            
             /* ── 蜂鸣器：ALERT 状态下非阻塞 5 声短鸣 ── */
             if(sys_state == STATE_ALERT)
             {
